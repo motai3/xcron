@@ -1,4 +1,4 @@
-package util
+package xutil
 
 import (
 	"fmt"
@@ -215,7 +215,7 @@ func normalizeFields(fields []string, options ParseOption) ([]string, error) {
 	return expandedFields, nil
 }
 
-var standardParser = NewParser(
+var StandardParser = NewParser(
 	Minute | Hour | Dom | Month | Dow | Descriptor,
 )
 
@@ -228,7 +228,7 @@ var standardParser = NewParser(
 //   - Standard crontab specs, e.g. "* * * * ?"
 //   - Descriptors, e.g. "@midnight", "@every 1h30m"
 func ParseStandard(standardSpec string) (xcron.Schedule, error) {
-	return standardParser.Parse(standardSpec)
+	return StandardParser.Parse(standardSpec)
 }
 
 // getField returns an Int with the bits set representing all of the times that
