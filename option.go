@@ -1,9 +1,9 @@
 package xcron
 
 import (
+	"github.com/motai3/xcron/log"
+	xutil "github.com/motai3/xcron/util"
 	"time"
-	"xcron/log"
-	xutil "xcron/util"
 )
 
 type Option func(*Cron)

@@ -2,11 +2,11 @@ package xcron
 
 import (
 	"context"
+	"github.com/motai3/xcron/log"
+	"github.com/motai3/xcron/util"
 	"sort"
 	"sync"
 	"time"
-	"xcron/log"
-	"xcron/util"
 )
 
 // Cron 作业运行中心
@@ -31,23 +31,16 @@ type EntryID int
 // Entry 任务实体封装
 type Entry struct {
 	ID         EntryID
-	Schedule   Schedule
+	Schedule   xutil.Schedule
 	Next       time.Time //作业将运行的时间
 	Prev       time.Time //该作业最后一次运行的时间
 	WrappedJob Job
 	Job        Job
 }
 
-// Schedule 调度器，调度任务何时运行
-type Schedule interface {
-	// Next returns the next activation time, later than the given time.
-	// Next is invoked initially, and then each time the job is run.
-	Next(time.Time) time.Time
-}
-
 // ScheduleParser 是一个时间解析器，返回一个Schedule
 type ScheduleParser interface {
-	Parse(spec string) (Schedule, error)
+	Parse(spec string) (xutil.Schedule, error)
 }
 
 // Job 任务接口
@@ -57,7 +50,9 @@ type Job interface {
 
 type FuncJob func()
 
-func (f FuncJob) Run() { f() }
+func (f FuncJob) Run() {
+	f()
+}
 
 func (e Entry) Valid() bool {
 	return e.ID != 0
@@ -114,7 +109,11 @@ func (c *Cron) AddJob(spec string, cmd Job) (EntryID, error) {
 	return c.Schedule(schedule, cmd), nil
 }
 
-func (c *Cron) Schedule(schedule Schedule, cmd Job) EntryID {
+func FuncExit() {
+	panic("FuncExit")
+}
+
+func (c *Cron) Schedule(schedule xutil.Schedule, cmd Job) EntryID {
 	c.runningMu.Lock()
 	defer c.runningMu.Unlock()
 	c.nextID++
@@ -214,6 +213,9 @@ func (c *Cron) run() {
 	}
 
 	for {
+		if len(c.entries) == 0 {
+			return
+		}
 		sort.Sort(byTime(c.entries))
 
 		var timer *time.Timer
@@ -233,7 +235,7 @@ func (c *Cron) run() {
 					if e.Next.After(now) || e.Next.IsZero() {
 						break
 					}
-					c.startJob(e.WrappedJob)
+					c.startJob(e.WrappedJob, e.ID)
 					e.Prev = e.Next
 					e.Next = e.Schedule.Next(now)
 					c.logger.Info("run", "now", now, "entry", e.ID, "next", e.Next)
@@ -282,10 +284,17 @@ func (c *Cron) Stop() context.Context {
 	return ctx
 }
 
-func (c *Cron) startJob(j Job) {
+func (c *Cron) startJob(j Job, id EntryID) {
 	c.jobWaiter.Add(1)
 	go func() {
-		defer c.jobWaiter.Done()
+		defer func() {
+			err := recover()
+			if err != nil {
+				c.logger.Info("panic error")
+				c.remove <- id
+			}
+			c.jobWaiter.Done()
+		}()
 		j.Run()
 	}()
 }

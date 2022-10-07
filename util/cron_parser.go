@@ -6,8 +6,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"xcron"
 )
+
+// Schedule 调度器，调度任务何时运行
+type Schedule interface {
+	// Next returns the next activation time, later than the given time.
+	// Next is invoked initially, and then each time the job is run.
+	Next(time.Time) time.Time
+}
 
 // Configuration options for creating a parser. Most options specify which
 // fields should be included, while others enable features. If a field is not
@@ -86,7 +92,7 @@ func NewParser(options ParseOption) Parser {
 // Parse returns a new crontab schedule representing the given spec.
 // It returns a descriptive error if the spec is not valid.
 // It accepts crontab specs and features configured by NewParser.
-func (p Parser) Parse(spec string) (xcron.Schedule, error) {
+func (p Parser) Parse(spec string) (Schedule, error) {
 	if len(spec) == 0 {
 		return nil, fmt.Errorf("empty spec string")
 	}
@@ -216,7 +222,7 @@ func normalizeFields(fields []string, options ParseOption) ([]string, error) {
 }
 
 var StandardParser = NewParser(
-	Minute | Hour | Dom | Month | Dow | Descriptor,
+	Second | Minute | Hour | Dom | Month | Dow | Descriptor,
 )
 
 // ParseStandard returns a new crontab schedule representing the given
@@ -227,7 +233,7 @@ var StandardParser = NewParser(
 // It accepts
 //   - Standard crontab specs, e.g. "* * * * ?"
 //   - Descriptors, e.g. "@midnight", "@every 1h30m"
-func ParseStandard(standardSpec string) (xcron.Schedule, error) {
+func ParseStandard(standardSpec string) (Schedule, error) {
 	return StandardParser.Parse(standardSpec)
 }
 
@@ -363,7 +369,7 @@ func all(r bounds) uint64 {
 }
 
 // parseDescriptor returns a predefined schedule for the expression, or error if none matches.
-func parseDescriptor(descriptor string, loc *time.Location) (xcron.Schedule, error) {
+func parseDescriptor(descriptor string, loc *time.Location) (Schedule, error) {
 	switch descriptor {
 	case "@yearly", "@annually":
 		return &SpecSchedule{

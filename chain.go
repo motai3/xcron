@@ -2,10 +2,10 @@ package xcron
 
 import (
 	"fmt"
+	"github.com/motai3/xcron/log"
 	"runtime"
 	"sync"
 	"time"
-	"xcron/log"
 )
 
 // JobWrapper 装饰器，修饰任务
